@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="la">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#6f1d2b">
+  <meta name="description" content="Forcellinus — przeszukiwalny tekst OCR Lexicon Totius Latinitatis.">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="icon" href="./icons/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="./styles.css">
+  <title>Forcellinus — Lexicon Totius Latinitatis</title>
+</head>
+<body>
+  <header class="masthead">
+    <div>
+      <p class="kicker">FORCELLINUS</p>
+      <p class="subtitle">Lexicon Totius Latinitatis</p>
+    </div>
+    <button id="theme-toggle" class="icon-button" type="button" aria-label="Mutare colorem" title="Tryb jasny / ciemny">◐</button>
+  </header>
+
+  <main>
+    <section class="hero" aria-labelledby="search-title">
+      <div class="hero-art" aria-hidden="true"></div>
+      <div class="hero-content">
+        <div class="flourish" aria-hidden="true"><span>❦</span></div>
+        <h1 id="search-title">Quid significat?</h1>
+        <form id="search-form" role="search">
+          <label class="sr-only" for="lemma">Lemma</label>
+          <input id="lemma" name="lemma" type="search" autocomplete="off" spellcheck="false"
+                 placeholder="ex. humanitas" required>
+          <button type="submit">Quaere</button>
+        </form>
+        <p id="status" class="status" role="status" aria-live="polite">Lexicon paratur…</p>
+      </div>
+    </section>
+
+    <div class="layout">
+      <article id="result" class="entry" hidden>
+        <header class="entry-header">
+          <div>
+            <p class="eyebrow">Lemma</p>
+            <h2 id="entry-title"></h2>
+          </div>
+          <button id="save-entry" class="icon-button save" type="button" aria-label="Servare lemma" title="Zapisz hasło">☆</button>
+        </header>
+        <pre id="entry-text"></pre>
+        <footer>
+          <p><strong>Nota:</strong> tekst pochodzi z automatycznego OCR i może zawierać błędy.</p>
+          <a id="source-link" href="" target="_blank" rel="noopener">Źródło: Internet Archive</a>
+        </footer>
+      </article>
+
+      <aside class="shelf" aria-label="Historia i zapisane hasła">
+        <div class="shelf-engraving" aria-hidden="true"></div>
+        <section>
+          <div class="section-heading">
+            <h2>Historia</h2>
+            <button id="clear-history" type="button" class="text-button">Wyczyść</button>
+          </div>
+          <ul id="history-list"></ul>
+        </section>
+        <section>
+          <h2>Zapisane</h2>
+          <ul id="saved-list"></ul>
+        </section>
+      </aside>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <div class="colophon-mark" aria-hidden="true">✦</div>
+    <p id="dataset-note"></p>
+    <p>Tekst źródłowy: Egidio Forcellini, <cite>Totius Latinitatis lexicon</cite>, wyd. 1828, publiczne skany Internet Archive.</p>
+    <p>Ryciny dekoracyjne: Giovanni Battista Piranesi, domena publiczna.</p>
+  </footer>
+  <script src="./app.js" type="module"></script>
+</body>
+</html>
