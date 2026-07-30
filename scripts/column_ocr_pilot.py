@@ -285,29 +285,39 @@ def ocr(
     base = OUTPUT / f"_{path.stem}"
     environment = os.environ.copy()
     environment["OMP_THREAD_LIMIT"] = "1"
-    subprocess.run(
-        [
-            "tesseract",
-            str(path),
-            str(base),
-            "--tessdata-dir",
-            str(TESSDATA),
-            "-l",
-            "grc+lat+eng",
-            "--oem",
-            "1",
-            "--psm",
-            "6",
-            "tsv",
-        ],
-        check=True,
-        capture_output=True,
-        text=True,
-        env=environment,
-    )
+    tsv_path = base.with_suffix(".tsv")
+    for attempt in range(3):
+        tsv_path.unlink(missing_ok=True)
+        result = subprocess.run(
+            [
+                "tesseract",
+                str(path),
+                str(base),
+                "--tessdata-dir",
+                str(TESSDATA),
+                "-l",
+                "grc+lat+eng",
+                "--oem",
+                "1",
+                "--psm",
+                "6",
+                "tsv",
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+            env=environment,
+        )
+        if tsv_path.exists() and tsv_path.stat().st_size > 100:
+            break
+        if attempt == 2:
+            raise RuntimeError(
+                f"Tesseract returned an empty TSV for {path}: {result.stderr}"
+            )
+        time.sleep(1)
     image = Image.open(path)
     lines: dict[tuple[str, ...], list[dict[str, str]]] = {}
-    with base.with_suffix(".tsv").open(encoding="utf-8") as stream:
+    with tsv_path.open(encoding="utf-8") as stream:
         for row in csv.DictReader(stream, delimiter="\t"):
             if row["level"] != "5" or not row["text"].strip():
                 continue
@@ -322,12 +332,17 @@ def ocr(
         corrected: list[str] = []
         for word_index, row in enumerate(words):
             observed = normalize(row["text"])
-            if word_index + 1 < len(words):
-                next_observed = words[word_index + 1]["text"]
-            elif line_index + 1 < len(ordered_lines) and ordered_lines[line_index + 1]:
-                next_observed = ordered_lines[line_index + 1][0]["text"]
-            else:
-                next_observed = ""
+            lookahead = list(words[word_index + 1 :])
+            if line_index + 1 < len(ordered_lines):
+                lookahead.extend(ordered_lines[line_index + 1])
+            next_observed = next(
+                (
+                    candidate["text"]
+                    for candidate in lookahead
+                    if latin_core(candidate["text"])
+                ),
+                "",
+            )
             observed, latin_review = correct_latin_ligature(
                 observed,
                 next_observed,
