@@ -372,6 +372,13 @@ form button:hover { background: var(--wine-bright); }
   padding-bottom: 5rem;
 }
 
+.layout.has-entry {
+  width: min(1540px, calc(100vw - 2.5rem));
+  margin-left: 50%;
+  transform: translateX(-50%);
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .entry,
 .shelf {
   border: 1px solid var(--rule);
@@ -381,7 +388,7 @@ form button:hover { background: var(--wine-bright); }
 
 .entry {
   position: relative;
-  padding: clamp(1.6rem, 5vw, 3.3rem);
+  padding: clamp(1.6rem, 3.5vw, 2.8rem);
 }
 
 .entry::before,
@@ -433,19 +440,19 @@ form button:hover { background: var(--wine-bright); }
   line-height: 1;
 }
 
-.entry pre {
-  max-width: 75ch;
-  margin: 0 auto;
+.entry-text {
+  max-width: none;
+  margin: 0;
   color: var(--ink);
-  font: 1.08rem/1.72 var(--serif);
+  font: 1.06rem/1.48 var(--serif);
   font-variant-ligatures: common-ligatures;
-  hyphens: auto;
-  white-space: pre-wrap;
+  hyphens: none;
+  white-space: normal;
   word-break: normal;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
 }
 
-.entry pre::first-letter {
+.entry-text::first-letter {
   float: left;
   margin: .08em .09em 0 0;
   color: var(--wine);
@@ -468,6 +475,29 @@ form button:hover { background: var(--wine-bright); }
   position: relative;
   overflow: hidden;
   padding: 0 1.35rem 1.5rem;
+}
+
+.layout.has-entry .shelf {
+  display: grid;
+  grid-template-columns: minmax(220px, .65fr) 1fr 1fr;
+  gap: 1.5rem;
+  padding: 0 1.5rem 0 0;
+}
+
+.layout.has-entry .shelf-engraving {
+  min-height: 170px;
+  height: 100%;
+  margin: 0;
+  border-right: 1px solid var(--rule);
+  border-bottom: 0;
+}
+
+.layout.has-entry .shelf section {
+  padding: 1.4rem 0;
+}
+
+.layout.has-entry .shelf section + section {
+  margin-top: 0;
 }
 
 .shelf-engraving {
@@ -648,6 +678,33 @@ form button:hover { background: var(--wine-bright); }
   .hero h1 { font-size: clamp(3.6rem, 17vw, 5.3rem); }
 
   .layout { grid-template-columns: 1fr; gap: 1.35rem; }
+  .layout.has-entry {
+    width: auto;
+    margin-left: 0;
+    transform: none;
+  }
+
+  .layout.has-entry .shelf {
+    display: block;
+    padding: 0 1.35rem 1.5rem;
+  }
+
+  .layout.has-entry .shelf-engraving {
+    height: 148px;
+    min-height: 0;
+    margin: 0 -1.35rem 1.35rem;
+    border-right: 0;
+    border-bottom: 1px solid var(--rule);
+  }
+
+  .layout.has-entry .shelf section {
+    padding: 0;
+  }
+
+  .layout.has-entry .shelf section + section {
+    margin-top: 2.2rem;
+  }
+
   .shelf { grid-row: 2; }
 
   form { flex-direction: column; }
@@ -656,7 +713,7 @@ form button:hover { background: var(--wine-bright); }
   .ornamental-divider { height: 105px; margin-top: 1rem; }
 
   .entry { padding: 2rem 1.35rem; }
-  .entry pre { font-size: 1.04rem; line-height: 1.68; }
+  .entry-text { font-size: 1.04rem; line-height: 1.58; }
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -106,6 +106,7 @@ async function search(rawQuery) {
     if (!entry) {
       state.entry = null;
       $("#result").hidden = true;
+      $(".layout").classList.remove("has-entry");
       setStatus(`Nie znaleziono hasła „${query}” w tej bazie OCR.`);
       return;
     }
@@ -114,6 +115,7 @@ async function search(rawQuery) {
     $("#entry-text").textContent = formatEntryText(entry.text);
     $("#source-link").href = state.meta.sources[entry.source].page_url;
     $("#result").hidden = false;
+    $(".layout").classList.add("has-entry");
     remember(entry.lemma);
     syncSaveButton();
     setStatus(`Inventa: ${entry.lemma}`);
