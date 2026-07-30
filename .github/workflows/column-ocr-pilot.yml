@@ -1,0 +1,69 @@
+name: Automatic column OCR pilot
+
+on:
+  push:
+    branches: [ocr-pilot-zero-cost]
+    paths:
+      - scripts/column_ocr_pilot.py
+      - data/ocr-gold-corrections.json
+      - .github/workflows/column-ocr-pilot.yml
+  pull_request:
+    paths:
+      - scripts/column_ocr_pilot.py
+      - data/ocr-gold-corrections.json
+      - .github/workflows/column-ocr-pilot.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install zero-cost OCR dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends tesseract-ocr
+          pip install numpy pillow
+          mkdir -p .cache/tessdata-best
+          cp -R /usr/share/tesseract-ocr/5/tessdata/configs .cache/tessdata-best/
+          for model in lat grc eng; do
+            curl --fail --location --retry 4 \
+              "https://github.com/tesseract-ocr/tessdata_best/raw/main/${model}.traineddata" \
+              --output ".cache/tessdata-best/${model}.traineddata"
+          done
+          git clone --depth 1 \
+            https://github.com/mrakia/hunspell-ancient-greek.git \
+            .cache/hunspell-ancient-greek
+          git clone --depth 1 \
+            https://github.com/latincy/verba.git \
+            .cache/verba
+
+      - name: Test automatic columns and Greek correction
+        run: python scripts/column_ocr_pilot.py
+
+      - name: Print quality report
+        if: always()
+        run: |
+          test -f column-ocr-pilot-output/report.json \
+            && python -m json.tool column-ocr-pilot-output/report.json \
+            || true
+
+      - name: Upload crops, OCR and report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: automatic-column-ocr-pilot
+          path: column-ocr-pilot-output
+          if-no-files-found: error
+          retention-days: 7

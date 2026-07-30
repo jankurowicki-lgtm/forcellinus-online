@@ -1,0 +1,57 @@
+name: Kraken OCR pilot
+
+on:
+  push:
+    branches: [ocr-pilot-zero-cost]
+    paths:
+      - scripts/kraken_pilot.py
+      - .github/workflows/kraken-pilot.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  compare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Kraken
+        run: pip install "kraken==6.0.0"
+
+      - name: Download open recognition models
+        run: |
+          mkdir -p .cache/kraken-models
+          curl --fail --location --retry 4 \
+            https://github.com/AjaxMultiCommentary/OCR-kraken-models/raw/main/kraken-models/greek-german_serifs_bsb10234118/greek-german_serifs_bsb10234118.mlmodel \
+            --output .cache/kraken-models/greek-latin-1835.mlmodel
+          curl --fail --location --retry 4 \
+            https://github.com/AjaxMultiCommentary/OCR-kraken-models/raw/main/kraken-models/greek-english_porson_sophoclesplaysa05campgoog/greek-english_porson_sophoclesplaysa05campgoog.mlmodel \
+            --output .cache/kraken-models/greek-english-1896.mlmodel
+
+      - name: Compare Kraken models
+        run: >-
+          python scripts/kraken_pilot.py
+          --model greek-latin-1835=.cache/kraken-models/greek-latin-1835.mlmodel
+          --model greek-english-1896=.cache/kraken-models/greek-english-1896.mlmodel
+
+      - name: Print report
+        if: always()
+        run: test -f kraken-pilot-output/report.md && cat kraken-pilot-output/report.md || true
+
+      - name: Upload scans, OCR and report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: kraken-ocr-pilot
+          path: kraken-pilot-output
+          if-no-files-found: error
+          retention-days: 7
