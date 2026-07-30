@@ -373,7 +373,7 @@ form button:hover { background: var(--wine-bright); }
 }
 
 .layout.has-entry {
-  width: min(1540px, calc(100vw - 2.5rem));
+  width: calc(100vw - .75rem);
   margin-left: 50%;
   transform: translateX(-50%);
   grid-template-columns: minmax(0, 1fr);
@@ -389,6 +389,10 @@ form button:hover { background: var(--wine-bright); }
 .entry {
   position: relative;
   padding: clamp(1.6rem, 3.5vw, 2.8rem);
+}
+
+.layout.has-entry .entry {
+  padding: clamp(1.1rem, 1.6vw, 1.65rem);
 }
 
 .entry::before,
@@ -682,6 +686,10 @@ form button:hover { background: var(--wine-bright); }
     width: auto;
     margin-left: 0;
     transform: none;
+  }
+
+  .layout.has-entry .entry {
+    padding: 1.5rem 1rem;
   }
 
   .layout.has-entry .shelf {
