@@ -26,9 +26,9 @@ jobs:
 
       - name: Install CPU recognition stack
         run: |
+          pip install "numpy<2" scipy pillow
           pip install --index-url https://download.pytorch.org/whl/cpu \
             "torch==2.2.2" "torchvision==0.17.2"
-          pip install pillow
           git clone --depth 1 https://github.com/kperi/Kalchas.git .cache/Kalchas
 
       - name: Compare polytonic Greek models
