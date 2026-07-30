@@ -15,6 +15,22 @@ function normalizeLemma(value) {
     .replace(/[^a-z]/g, "");
 }
 
+function decodeOcrEntities(value) {
+  const textarea = document.createElement("textarea");
+  textarea.innerHTML = value;
+  return textarea.value;
+}
+
+function formatEntryText(value) {
+  return decodeOcrEntities(value)
+    .normalize("NFC")
+    .replace(/[\u00ad\u200b\ufeff]/g, "")
+    .replace(/(\p{L})-\s*\n\s*(?=\p{Ll})/gu, "$1")
+    .replace(/\s*\n+\s*/g, " ")
+    .replace(/[ \t]{2,}/g, " ")
+    .trim();
+}
+
 function bucketFor(key) { return (key.slice(0, 2) || "_").padEnd(2, "_"); }
 function setStatus(message) { $("#status").textContent = message; }
 
@@ -95,7 +111,7 @@ async function search(rawQuery) {
     }
     state.entry = entry;
     $("#entry-title").textContent = entry.lemma;
-    $("#entry-text").textContent = entry.text;
+    $("#entry-text").textContent = formatEntryText(entry.text);
     $("#source-link").href = state.meta.sources[entry.source].page_url;
     $("#result").hidden = false;
     remember(entry.lemma);
