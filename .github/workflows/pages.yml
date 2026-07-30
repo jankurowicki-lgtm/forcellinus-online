@@ -6,6 +6,7 @@ on:
   workflow_dispatch:
 
 permissions:
+  actions: read
   contents: read
   pages: write
   id-token: write
@@ -15,8 +16,54 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  ocr_cache:
+    name: Prepare Greek OCR cache
+    runs-on: ubuntu-latest
+    outputs:
+      ready: ${{ steps.status.outputs.ready }}
+    steps:
+      - name: Restore merged OCR cache
+        id: restore
+        uses: actions/cache@v4
+        with:
+          path: .cache/greek-ocr/pages
+          key: forcellinus-greek-ocr-v1
+
+      - name: Seed cache from the verified OCR run
+        if: steps.restore.outputs.cache-hit != 'true'
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: 30523198813
+          pattern: greek-ocr-*
+          path: .cache/greek-ocr/pages
+          merge-multiple: true
+
+      - name: Check cached page count
+        id: status
+        run: |
+          count=$(find .cache/greek-ocr/pages -type f -name '*.txt' 2>/dev/null | wc -l)
+          echo "OCR pages: $count"
+          if [ "$count" -ge 2800 ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Upload cached OCR for this run
+        if: steps.status.outputs.ready == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: greek-ocr-cached
+          path: .cache/greek-ocr/pages
+          if-no-files-found: error
+          retention-days: 1
+
   ocr:
     name: OCR Latin + Ancient Greek (shard ${{ matrix.shard }}/3)
+    needs: ocr_cache
+    if: needs.ocr_cache.outputs.ready != 'true'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -65,7 +112,11 @@ jobs:
           retention-days: 1
 
   build:
-    needs: ocr
+    needs: [ocr_cache, ocr]
+    if: >-
+      always() &&
+      needs.ocr_cache.result == 'success' &&
+      (needs.ocr.result == 'success' || needs.ocr.result == 'skipped')
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -82,6 +133,12 @@ jobs:
           pattern: greek-ocr-*
           path: .cache/greek-ocr/pages
           merge-multiple: true
+
+      - name: Save merged OCR cache
+        uses: actions/cache/save@v4
+        with:
+          path: .cache/greek-ocr/pages
+          key: forcellinus-greek-ocr-v1
 
       - name: Build dictionary from Latin and Ancient Greek OCR
         run: python scripts/build_dictionary.py --ocr-pages .cache/greek-ocr/pages
