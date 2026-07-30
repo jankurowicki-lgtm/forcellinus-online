@@ -38,6 +38,9 @@ jobs:
           git clone --depth 1 \
             https://github.com/mrakia/hunspell-ancient-greek.git \
             .cache/hunspell-ancient-greek
+          git clone --depth 1 \
+            https://github.com/latincy/verba.git \
+            .cache/verba
 
       - name: Test automatic columns and Greek correction
         run: python scripts/column_ocr_pilot.py
