@@ -45,6 +45,7 @@ body {
     var(--paper);
   color: var(--ink);
   font-family: var(--serif);
+  font-feature-settings: "locl" 0, "kern" 1, "liga" 1;
   font-size: 17px;
   line-height: 1.62;
 }
