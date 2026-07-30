@@ -5,6 +5,7 @@ from __future__ import annotations
 import csv
 import json
 import os
+import re
 import subprocess
 import tempfile
 import time
@@ -22,6 +23,7 @@ OUTPUT = ROOT / "column-ocr-pilot-output"
 IMAGE_ROOT = OUTPUT / "images"
 TESSDATA = ROOT / ".cache/tessdata-best"
 GREEK_WORDLIST = ROOT / ".cache/hunspell-ancient-greek/grc_GR.dic"
+LATIN_WORDLIST = ROOT / ".cache/verba/verba.txt"
 USER_AGENT = (
     "Forcellinus-PWA-Column-OCR-Pilot/1.0 "
     "(+https://github.com/jankurowicki-lgtm/forcellinus-online)"
@@ -104,6 +106,86 @@ def load_greek_words() -> set[str]:
             if word:
                 words.add(word)
     return words
+
+
+def normalize_latin(text: str) -> str:
+    return (
+        text.casefold()
+        .replace("æ", "ae")
+        .replace("œ", "oe")
+        .replace("j", "i")
+        .replace("v", "u")
+    )
+
+
+def latin_core(text: str) -> str:
+    return "".join(re.findall(r"[A-Za-zÆŒæœ]+", text))
+
+
+def load_latin_words() -> set[str]:
+    return {
+        normalize_latin(line.strip())
+        for line in LATIN_WORDLIST.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    }
+
+
+def ligature_variants(word: str) -> set[str]:
+    """Generate conservative OCR confusions for printed æ/œ ligatures."""
+    lowered = word.casefold()
+    variants: set[str] = set()
+    for index, character in enumerate(lowered):
+        if character == "e":
+            variants.add(lowered[:index] + "a" + lowered[index:])
+            variants.add(lowered[:index] + "o" + lowered[index:])
+        elif character == "z":
+            variants.add(lowered[:index] + "ae" + lowered[index + 1 :])
+    return variants
+
+
+def printed_ligatures(word: str) -> str:
+    return word.replace("ae", "æ").replace("oe", "œ")
+
+
+def correct_latin_ligature(
+    observed: str,
+    next_observed: str,
+    confidence: float,
+    wordlist: set[str],
+) -> tuple[str, dict | None]:
+    """Correct only unambiguous low-confidence ligatures; queue ambiguities."""
+    if confidence >= 50:
+        return observed, None
+    core = latin_core(observed)
+    if len(core) < 2:
+        return observed, None
+    next_core = latin_core(next_observed) if observed.rstrip().endswith("-") else ""
+    observed_joined = normalize_latin(core + next_core)
+    valid_candidates = {
+        candidate
+        for candidate in ligature_variants(core)
+        if normalize_latin(candidate + next_core) in wordlist
+    }
+    if not valid_candidates:
+        return observed, None
+
+    review = {
+        "observed": observed,
+        "next": next_observed,
+        "confidence": confidence,
+        "candidates": sorted(printed_ligatures(item) for item in valid_candidates),
+    }
+    if observed_joined in wordlist or len(valid_candidates) != 1:
+        review["status"] = "manual-review"
+        return observed, review
+
+    candidate = valid_candidates.pop()
+    replacement = printed_ligatures(candidate)
+    if observed.rstrip().endswith("-"):
+        replacement += "-"
+    review["status"] = "auto-corrected"
+    review["replacement"] = replacement
+    return replacement, review
 
 
 def download_image(filename: str) -> Path:
@@ -195,7 +277,11 @@ def recognize_greek_word(image: Image.Image) -> str:
         temporary.unlink(missing_ok=True)
 
 
-def ocr(path: Path, wordlist: set[str]) -> str:
+def ocr(
+    path: Path,
+    greek_wordlist: set[str],
+    latin_wordlist: set[str],
+) -> tuple[str, list[dict]]:
     base = OUTPUT / f"_{path.stem}"
     environment = os.environ.copy()
     environment["OMP_THREAD_LIMIT"] = "1"
@@ -229,11 +315,33 @@ def ocr(path: Path, wordlist: set[str]) -> str:
             lines.setdefault(key, []).append(row)
 
     rendered: list[str] = []
+    review_queue: list[dict] = []
     pending_prefix = ""
-    for words in lines.values():
+    ordered_lines = list(lines.values())
+    for line_index, words in enumerate(ordered_lines):
         corrected: list[str] = []
-        for row in words:
+        for word_index, row in enumerate(words):
             observed = normalize(row["text"])
+            if word_index + 1 < len(words):
+                next_observed = words[word_index + 1]["text"]
+            elif line_index + 1 < len(ordered_lines) and ordered_lines[line_index + 1]:
+                next_observed = ordered_lines[line_index + 1][0]["text"]
+            else:
+                next_observed = ""
+            observed, latin_review = correct_latin_ligature(
+                observed,
+                next_observed,
+                float(row["conf"]),
+                latin_wordlist,
+            )
+            if latin_review:
+                latin_review.update(
+                    {
+                        "left": int(row["left"]),
+                        "top": int(row["top"]),
+                    }
+                )
+                review_queue.append(latin_review)
             core = greek_core(observed)
             should_retry = bool(core) or bool(pending_prefix)
             if should_retry:
@@ -254,8 +362,8 @@ def ocr(path: Path, wordlist: set[str]) -> str:
                 )
                 candidate = recognize_greek_word(crop)
                 candidate_core = greek_core(candidate)
-                if candidate_core in wordlist or (
-                    pending_prefix and pending_prefix + candidate_core in wordlist
+                if candidate_core in greek_wordlist or (
+                    pending_prefix and pending_prefix + candidate_core in greek_wordlist
                 ):
                     observed = candidate
                     core = candidate_core
@@ -266,7 +374,7 @@ def ocr(path: Path, wordlist: set[str]) -> str:
             elif pending_prefix:
                 pending_prefix = ""
         rendered.append(" ".join(corrected))
-    return normalize("\n".join(rendered))
+    return normalize("\n".join(rendered)), review_queue
 
 
 def run_case(case: Case) -> dict:
@@ -275,7 +383,11 @@ def run_case(case: Case) -> dict:
     OUTPUT.mkdir(parents=True, exist_ok=True)
     crop_path = OUTPUT / f"{case.name}-column-{case.column + 1}.png"
     crop_column(image, case.column, boundaries).save(crop_path)
-    text = ocr(crop_path, load_greek_words())
+    text, review_queue = ocr(
+        crop_path,
+        load_greek_words(),
+        load_latin_words(),
+    )
     text_path = OUTPUT / f"{case.name}.txt"
     text_path.write_text(text, encoding="utf-8")
     checks = {expected: expected in text for expected in case.expected}
@@ -289,6 +401,7 @@ def run_case(case: Case) -> dict:
         "boundaries": boundaries,
         "checks": checks,
         "edition_checks": edition_checks,
+        "review_queue": review_queue,
         "passed": all(checks.values()),
         "edition_exact": all(edition_checks.values()) if edition_checks else True,
     }
