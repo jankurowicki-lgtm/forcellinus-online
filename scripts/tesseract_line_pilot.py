@@ -128,7 +128,82 @@ def download(identifier: str, leaf: int, destination: Path) -> None:
 
 
 def normalize(value: str) -> str:
-    return unicodedata.normalize("NFC", value).strip()
+    return unicodedata.normalize("NFC", value).replace("ϑ", "θ").strip()
+
+
+def greek_tokens(value: str) -> list[str]:
+    """Return Greek runs without trusting OCR spaces or surrounding Latin."""
+    tokens: list[str] = []
+    current: list[str] = []
+    for character in normalize(value):
+        code = ord(character)
+        is_greek = 0x0370 <= code <= 0x03FF or 0x1F00 <= code <= 0x1FFF
+        is_mark = unicodedata.category(character) == "Mn"
+        if is_greek or (is_mark and current) or (character == "-" and current):
+            current.append(character)
+        elif current:
+            tokens.append("".join(current).strip("-"))
+            current = []
+    if current:
+        tokens.append("".join(current).strip("-"))
+    return [token for token in tokens if token]
+
+
+def load_wordlist(path: Path) -> set[str]:
+    words: set[str] = set()
+    with path.open(encoding="utf-8") as stream:
+        next(stream, None)
+        for line in stream:
+            word = line.strip().split("/", 1)[0]
+            if word:
+                words.add(normalize(word))
+    return words
+
+
+def choose_ensemble(rows: list[dict], wordlist: set[str]) -> list[dict]:
+    """Prefer candidates whose Greek tokens are known to Morpheus/Hunspell."""
+    useful = ("word-grc-only-enhanced", "line-grc-first-enhanced")
+    by_sample = {
+        sample.name: [row for row in rows if row["sample"] == sample.name and row["config"] in useful]
+        for sample in SAMPLES
+    }
+    selected: dict[str, str] = {}
+    for sample in SAMPLES:
+        candidates = by_sample[sample.name]
+        ranked = []
+        for row in candidates:
+            observed = normalize(row["observed"])
+            tokens = greek_tokens(observed)
+            valid = [token for token in tokens if token in wordlist]
+            ranked.append(((len(valid), sum(map(len, valid))), observed))
+        selected[sample.name] = max(ranked)[1]
+
+    # Resolve words divided by a printed end-of-line hyphen. A prefix/suffix
+    # pair is accepted only if their joined form exists in the Greek wordlist.
+    for left, right in zip(SAMPLES, SAMPLES[1:]):
+        for left_row in by_sample[left.name]:
+            left_observed = normalize(left_row["observed"])
+            left_parts = greek_tokens(left_observed)
+            if not left_parts or not any(part + "-" in left_observed for part in left_parts):
+                continue
+            prefix = left_parts[-1]
+            for right_row in by_sample[right.name]:
+                right_observed = normalize(right_row["observed"])
+                for suffix in greek_tokens(right_observed):
+                    if prefix + suffix in wordlist:
+                        selected[left.name] = left_observed
+                        selected[right.name] = right_observed
+
+    return [
+        {
+            "config": "lexicon-validated-ensemble",
+            "sample": sample.name,
+            "expected": normalize(sample.expected),
+            "observed": selected[sample.name],
+            "exact": normalize(sample.expected) in selected[sample.name],
+        }
+        for sample in SAMPLES
+    ]
 
 
 def enhance(image: Image.Image) -> Image.Image:
@@ -202,12 +277,15 @@ def main() -> None:
                 }
             )
 
+    wordlist = load_wordlist(Path(".cache/hunspell-ancient-greek/grc_GR.dic"))
+    rows.extend(choose_ensemble(rows, wordlist))
+
     summary = {
         config: {
             "passed": sum(row["exact"] for row in rows if row["config"] == config),
             "total": len(SAMPLES),
         }
-        for config, *_ in CONFIGS
+        for config in [*(item[0] for item in CONFIGS), "lexicon-validated-ensemble"]
     }
     report = {"summary": summary, "samples": rows}
     (output / "report.json").write_text(
