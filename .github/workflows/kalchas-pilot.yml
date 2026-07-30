@@ -1,0 +1,50 @@
+name: Polytonic Greek OCR pilot
+
+on:
+  push:
+    branches: [ocr-pilot-zero-cost]
+    paths:
+      - scripts/kalchas_pilot.py
+      - .github/workflows/kalchas-pilot.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  compare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install CPU recognition stack
+        run: |
+          pip install --index-url https://download.pytorch.org/whl/cpu \
+            "torch==2.2.2" "torchvision==0.17.2"
+          pip install pillow
+          git clone --depth 1 https://github.com/kperi/Kalchas.git .cache/Kalchas
+
+      - name: Compare polytonic Greek models
+        env:
+          PYTHONPATH: .cache/Kalchas
+        run: python scripts/kalchas_pilot.py
+
+      - name: Print report
+        if: always()
+        run: test -f kalchas-pilot-output/report.md && cat kalchas-pilot-output/report.md || true
+
+      - name: Upload word crops and report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: kalchas-ocr-pilot
+          path: kalchas-pilot-output
+          if-no-files-found: error
+          retention-days: 7
