@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Evaluate free polytonic-Greek OCR on exact Forcellinus word crops."""
+"""Evaluate free polytonic-Greek OCR on segmented Forcellinus text lines."""
 from __future__ import annotations
 
 import json
@@ -25,52 +25,64 @@ class Sample:
     identifier: str
     leaf: int
     box: tuple[int, int, int, int]
-    expected: str
+    expected_token: str
 
 
 SAMPLES = (
-    Sample("cauda-kerkos", "totiuslatinitati01forc", 364, (875, 325, 1005, 395), "κέρκος,"),
-    Sample("cauda-oura", "totiuslatinitati01forc", 364, (40, 375, 150, 445), "οὐρὰ,"),
+    Sample(
+        "cauda-kerkos",
+        "totiuslatinitati01forc",
+        364,
+        (40, 345, 1010, 405),
+        "κέρκος,",
+    ),
+    Sample(
+        "cauda-oura",
+        "totiuslatinitati01forc",
+        364,
+        (40, 405, 1010, 465),
+        "οὐρὰ,",
+    ),
     Sample(
         "germanus-kasignetos",
         "totiuslatinitati01forc",
         869,
-        (190, 2915, 420, 2990),
+        (180, 2940, 1110, 3000),
         "κασίγνητος,",
     ),
     Sample(
         "humanitas-anthro",
         "totiuslatinitati01forc",
         923,
-        (2025, 3015, 2175, 3090),
+        (1180, 3035, 2160, 3095),
         "ἀνθρω-",
     ),
     Sample(
         "humanitas-potes",
         "totiuslatinitati01forc",
         923,
-        (1180, 3060, 1340, 3135),
+        (1180, 3090, 2160, 3150),
         "πότης,",
     ),
     Sample(
         "humanitas-philanthropia",
         "totiuslatinitati01forc",
         923,
-        (1320, 3145, 1560, 3220),
+        (1180, 3155, 2160, 3215),
         "φιλανθρωπία",
     ),
     Sample(
         "ratio-greek",
         "totiuslatinitati02forc",
         372,
-        (1375, 2745, 1595, 2820),
+        (1200, 2770, 2280, 2830),
         "νοῦς, λόγος,",
     ),
     Sample(
         "supra-hyper",
         "totiuslatinitati02forc",
         689,
-        (1840, 4025, 1960, 4100),
+        (1230, 4040, 2310, 4100),
         "ὑπὲρ,",
     ),
 )
@@ -119,7 +131,7 @@ def main() -> None:
         model = load_ocr_model(model_name)
         observed = model.ocr([Image.open(path).convert("L") for path in crop_paths])
         for sample, text in zip(SAMPLES, observed):
-            expected = normalize(sample.expected)
+            expected = normalize(sample.expected_token)
             actual = normalize(text)
             rows.append(
                 {
@@ -127,7 +139,7 @@ def main() -> None:
                     "sample": sample.name,
                     "expected": expected,
                     "observed": actual,
-                    "exact": actual == expected,
+                    "exact": expected in actual,
                 }
             )
 
@@ -147,7 +159,7 @@ def main() -> None:
     lines = [
         "# Forcellinus polytonic-Greek OCR pilot",
         "",
-        "| Model | Exact word crops |",
+        "| Model | Exact Greek tokens retained in segmented lines |",
         "|---|---:|",
     ]
     for model_name, result in summary.items():
