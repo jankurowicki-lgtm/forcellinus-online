@@ -32,7 +32,7 @@ SOURCES = [
         "volume": "2",
     },
 ]
-REQUIRED = ("humanitas", "virtus", "natura", "amicitia", "amor", "res")
+REQUIRED = ("humanitas", "virtus", "natura", "amicitia", "amor", "res", "ratio")
 RUNNING_HEADER = re.compile(
     r"^(?:LEXICON\s+TOTIUS\s+LATINITATIS|TOTIUS\s+LATINITATIS\s+LEXICON|"
     r"FORCELLIN(?:I|US)|AEGIDII\s+FORCELLINI|VOL(?:UMEN)?\.?\s+[IVXLC]+)$",
@@ -160,16 +160,30 @@ def download(url: str, destination: Path, attempts: int = 4) -> str:
     raise RuntimeError("download failed")
 
 
+def assembled_page_ocr(root: Path, source: dict) -> str:
+    page_dir = root / source["id"]
+    pages = sorted(page_dir.glob("*.txt"))
+    if len(pages) < 1_000:
+        raise RuntimeError(
+            f"Niepełny OCR {source['id']}: znaleziono tylko {len(pages)} stron w {page_dir}"
+        )
+    return "\n\n".join(page.read_text(encoding="utf-8", errors="replace") for page in pages)
+
+
 def write_json(path: Path, value: object) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(value, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
 
 
-def build(output: Path, cache: Path) -> dict:
+def build(output: Path, cache: Path, ocr_pages: Path | None = None) -> dict:
     texts: list[str] = []
     articles: list[Article] = []
     for source_index, source in enumerate(SOURCES):
-        text = download(source["url"], cache / f'{source["id"]}.txt')
+        text = (
+            assembled_page_ocr(ocr_pages, source)
+            if ocr_pages
+            else download(source["url"], cache / f'{source["id"]}.txt')
+        )
         texts.append(text)
         articles.extend(extract_articles(text, source_index))
 
@@ -226,7 +240,13 @@ def build(output: Path, cache: Path) -> dict:
         "article_count": len(articles),
         "required_found": required_found,
         "generated_from_ocr": True,
-        "notice": "Automatyczny tekst OCR; zachowano brzmienie źródła, możliwe błędy rozpoznania.",
+        "ocr_languages": ["lat", "grc", "eng"] if ocr_pages else ["eng"],
+        "notice": (
+            "Automatyczny OCR łacińsko-starogrecki; zachowano grekę i brzmienie źródła, "
+            "możliwe błędy rozpoznania."
+            if ocr_pages
+            else "Automatyczny tekst OCR; zachowano brzmienie źródła, możliwe błędy rozpoznania."
+        ),
         "sources": SOURCES,
     }
     write_json(data_dir / "meta.json", metadata)
@@ -238,8 +258,13 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--output", type=Path, default=Path("public"))
     parser.add_argument("--cache", type=Path, default=Path(".cache/ocr"))
+    parser.add_argument(
+        "--ocr-pages",
+        type=Path,
+        help="Katalog połączonych shardów OCR lat+grc; bez tej opcji używany jest stary OCR IA.",
+    )
     args = parser.parse_args()
-    build(args.output, args.cache)
+    build(args.output, args.cache, args.ocr_pages)
 
 
 if __name__ == "__main__":

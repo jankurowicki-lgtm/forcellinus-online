@@ -15,7 +15,52 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  ocr:
+    name: OCR Latin + Ancient Greek (shard ${{ matrix.shard }}/3)
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        shard: [0, 1, 2, 3]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Download Latin and Ancient Greek OCR models
+        run: |
+          mkdir -p .cache/tessdata
+          curl --fail --location --retry 4 \
+            https://github.com/tesseract-ocr/tessdata_fast/raw/main/lat.traineddata \
+            --output .cache/tessdata/lat.traineddata
+          curl --fail --location --retry 4 \
+            https://github.com/tesseract-ocr/tessdata_fast/raw/main/grc.traineddata \
+            --output .cache/tessdata/grc.traineddata
+          cp /usr/share/tesseract-ocr/5/tessdata/eng.traineddata .cache/tessdata/
+
+      - name: OCR scan pages
+        run: >-
+          python scripts/ocr_pages.py
+          --shard ${{ matrix.shard }}
+          --shard-count 4
+          --workers 4
+          --tessdata .cache/tessdata
+
+      - name: Upload OCR shard
+        uses: actions/upload-artifact@v4
+        with:
+          name: greek-ocr-${{ matrix.shard }}
+          path: .cache/greek-ocr/pages
+          if-no-files-found: error
+          retention-days: 1
+
   build:
+    needs: ocr
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -26,8 +71,15 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Build dictionary from Internet Archive OCR
-        run: python scripts/build_dictionary.py
+      - name: Download Greek OCR shards
+        uses: actions/download-artifact@v4
+        with:
+          pattern: greek-ocr-*
+          path: .cache/greek-ocr/pages
+          merge-multiple: true
+
+      - name: Build dictionary from Latin and Ancient Greek OCR
+        run: python scripts/build_dictionary.py --ocr-pages .cache/greek-ocr/pages
 
       - name: Test required lemmas
         run: python tests/test_dictionary.py
