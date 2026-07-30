@@ -30,6 +30,7 @@ jobs:
           sudo apt-get install --yes --no-install-recommends tesseract-ocr
           pip install numpy pillow
           mkdir -p .cache/tessdata-best
+          cp -R /usr/share/tesseract-ocr/5/tessdata/configs .cache/tessdata-best/
           for model in lat grc eng; do
             curl --fail --location --retry 4 \
               "https://github.com/tesseract-ocr/tessdata_best/raw/main/${model}.traineddata" \
