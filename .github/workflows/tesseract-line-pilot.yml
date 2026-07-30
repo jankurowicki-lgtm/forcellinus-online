@@ -1,0 +1,53 @@
+name: Segmented Tesseract OCR pilot
+
+on:
+  push:
+    branches: [ocr-pilot-zero-cost]
+    paths:
+      - scripts/tesseract_line_pilot.py
+      - .github/workflows/tesseract-line-pilot.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  compare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install free OCR stack
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends tesseract-ocr
+          pip install pillow
+          mkdir -p .cache/tessdata-best
+          for model in lat grc eng; do
+            curl --fail --location --retry 4 \
+              "https://github.com/tesseract-ocr/tessdata_best/raw/main/${model}.traineddata" \
+              --output ".cache/tessdata-best/${model}.traineddata"
+          done
+
+      - name: Compare segmented OCR configurations
+        run: python scripts/tesseract_line_pilot.py
+
+      - name: Print report
+        if: always()
+        run: test -f tesseract-line-pilot-output/report.md && cat tesseract-line-pilot-output/report.md || true
+
+      - name: Upload crops and report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tesseract-line-ocr-pilot
+          path: tesseract-line-pilot-output
+          if-no-files-found: error
+          retention-days: 7
