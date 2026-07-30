@@ -1,4 +1,4 @@
-const CACHE = "forcellinus-shell-v7";
+const CACHE = "forcellinus-shell-v8";
 const SHELL = [
   "./", "./index.html", "./styles.css", "./app.js", "./manifest.webmanifest",
   "./icons/icon.svg", "./art/DP828188-edit.webp", "./art/DP828228-edit.webp",

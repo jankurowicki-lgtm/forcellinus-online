@@ -11,8 +11,8 @@
   --rule-soft: #d8ccb5;
   --gold: #9e8250;
   --shadow: 0 22px 55px rgb(65 43 25 / 9%);
-  --serif: "EB Garamond", "Iowan Old Style", "Palatino Linotype", Garamond, Georgia, serif;
-  --display: "Cormorant Garamond", "EB Garamond", Garamond, Georgia, serif;
+  --serif: "Cardo", "Iowan Old Style", "Palatino Linotype", Garamond, Georgia, serif;
+  --display: "Cormorant Garamond", "Cardo", Garamond, Georgia, serif;
 }
 
 :root[data-theme="dark"] {
@@ -45,8 +45,6 @@ body {
     var(--paper);
   color: var(--ink);
   font-family: var(--serif);
-  font-feature-settings: "locl" 0, "kern" 1, "liga" 1;
-  font-language-override: "ENG";
   font-size: 17px;
   line-height: 1.62;
 }
