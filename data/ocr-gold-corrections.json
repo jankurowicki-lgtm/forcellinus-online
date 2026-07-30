@@ -1,0 +1,62 @@
+{
+  "schema": 1,
+  "edition": "Forcellini, Bailey edition, London 1828",
+  "corrections": [
+    {
+      "case": "cauda",
+      "left": 694,
+      "top": 590,
+      "observed": "Cedere",
+      "replacement": "Cædere",
+      "evidence": "totiuslatinitati01forc, leaf 364, column 1"
+    },
+    {
+      "case": "cauda",
+      "left": 233,
+      "top": 763,
+      "observed": "equora",
+      "replacement": "æquora",
+      "evidence": "totiuslatinitati01forc, leaf 364, column 1"
+    },
+    {
+      "case": "humanitas",
+      "left": 145,
+      "top": 1057,
+      "observed": "queso?",
+      "replacement": "quæso?",
+      "evidence": "totiuslatinitati01forc, leaf 923, column 2"
+    },
+    {
+      "case": "humanitas",
+      "left": 173,
+      "top": 2132,
+      "observed": "Hec,",
+      "replacement": "Hæc,",
+      "evidence": "totiuslatinitati01forc, leaf 923, column 2"
+    },
+    {
+      "case": "humanitas",
+      "left": 207,
+      "top": 2336,
+      "observed": "sententie:",
+      "replacement": "sententiæ",
+      "evidence": "totiuslatinitati01forc, leaf 923, column 2"
+    },
+    {
+      "case": "otacilius",
+      "left": 575,
+      "top": 3650,
+      "observed": "edem",
+      "replacement": "ædem",
+      "evidence": "totiuslatinitati01forc, leaf 1215, column 2"
+    },
+    {
+      "case": "ratio",
+      "left": 0,
+      "top": 1451,
+      "observed": "Rose.",
+      "replacement": "Rosc.",
+      "evidence": "totiuslatinitati02forc, leaf 372, column 2"
+    }
+  ]
+}
