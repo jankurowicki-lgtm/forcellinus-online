@@ -24,6 +24,7 @@ IMAGE_ROOT = OUTPUT / "images"
 TESSDATA = ROOT / ".cache/tessdata-best"
 GREEK_WORDLIST = ROOT / ".cache/hunspell-ancient-greek/grc_GR.dic"
 LATIN_WORDLIST = ROOT / ".cache/verba/verba.txt"
+GOLD_CORRECTIONS = ROOT / "data/ocr-gold-corrections.json"
 USER_AGENT = (
     "Forcellinus-PWA-Column-OCR-Pilot/1.0 "
     "(+https://github.com/jankurowicki-lgtm/forcellinus-online)"
@@ -127,6 +128,14 @@ def load_latin_words() -> set[str]:
         normalize_latin(line.strip())
         for line in LATIN_WORDLIST.read_text(encoding="utf-8").splitlines()
         if line.strip()
+    }
+
+
+def load_gold_corrections() -> dict[tuple[str, int, int], dict]:
+    payload = json.loads(GOLD_CORRECTIONS.read_text(encoding="utf-8"))
+    return {
+        (item["case"], item["left"], item["top"]): item
+        for item in payload["corrections"]
     }
 
 
@@ -281,6 +290,7 @@ def ocr(
     path: Path,
     greek_wordlist: set[str],
     latin_wordlist: set[str],
+    gold_corrections: dict[tuple[str, int, int], dict],
 ) -> tuple[str, list[dict]]:
     base = OUTPUT / f"_{path.stem}"
     environment = os.environ.copy()
@@ -327,6 +337,7 @@ def ocr(
     rendered: list[str] = []
     review_queue: list[dict] = []
     pending_prefix = ""
+    case_name = path.stem.split("-column-", 1)[0]
     ordered_lines = list(lines.values())
     for line_index, words in enumerate(ordered_lines):
         corrected: list[str] = []
@@ -349,11 +360,33 @@ def ocr(
                 float(row["conf"]),
                 latin_wordlist,
             )
+            left, top = int(row["left"]), int(row["top"])
+            gold = gold_corrections.get((case_name, left, top))
+            if gold:
+                if normalize(row["text"]) != normalize(gold["observed"]):
+                    raise RuntimeError(
+                        f"stale gold correction at {case_name}:{left}:{top}: "
+                        f"expected {gold['observed']!r}, saw {row['text']!r}"
+                    )
+                observed = gold["replacement"]
+                latin_review = latin_review or {
+                    "observed": row["text"],
+                    "next": next_observed,
+                    "confidence": float(row["conf"]),
+                    "candidates": [],
+                }
+                latin_review.update(
+                    {
+                        "status": "gold-corrected",
+                        "replacement": gold["replacement"],
+                        "evidence": gold["evidence"],
+                    }
+                )
             if latin_review:
                 latin_review.update(
                     {
-                        "left": int(row["left"]),
-                        "top": int(row["top"]),
+                        "left": left,
+                        "top": top,
                     }
                 )
                 review_queue.append(latin_review)
@@ -402,6 +435,7 @@ def run_case(case: Case) -> dict:
         crop_path,
         load_greek_words(),
         load_latin_words(),
+        load_gold_corrections(),
     )
     text_path = OUTPUT / f"{case.name}.txt"
     text_path.write_text(text, encoding="utf-8")
@@ -417,6 +451,9 @@ def run_case(case: Case) -> dict:
         "checks": checks,
         "edition_checks": edition_checks,
         "review_queue": review_queue,
+        "unresolved_reviews": sum(
+            item["status"] == "manual-review" for item in review_queue
+        ),
         "passed": all(checks.values()),
         "edition_exact": all(edition_checks.values()) if edition_checks else True,
     }
@@ -431,11 +468,14 @@ def main() -> None:
         "passed": sum(row["passed"] for row in rows),
         "total": len(rows),
         "edition_exact": all(row["edition_exact"] for row in rows),
-        "quality_gate": (
-            "pass"
-            if all(row["passed"] and row["edition_exact"] for row in rows)
-            else "blocked"
-        ),
+        "quality_gate": "pass"
+        if all(
+            row["passed"]
+            and row["edition_exact"]
+            and row["unresolved_reviews"] == 0
+            for row in rows
+        )
+        else "blocked",
         "cases": rows,
     }
     (OUTPUT / "report.json").write_text(
