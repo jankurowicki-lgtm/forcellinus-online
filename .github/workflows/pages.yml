@@ -32,8 +32,10 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Download Latin and Ancient Greek OCR models
+      - name: Install Tesseract and OCR models
         run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends tesseract-ocr
           mkdir -p .cache/tessdata
           curl --fail --location --retry 4 \
             https://github.com/tesseract-ocr/tessdata_fast/raw/main/lat.traineddata \
@@ -41,7 +43,10 @@ jobs:
           curl --fail --location --retry 4 \
             https://github.com/tesseract-ocr/tessdata_fast/raw/main/grc.traineddata \
             --output .cache/tessdata/grc.traineddata
-          cp /usr/share/tesseract-ocr/5/tessdata/eng.traineddata .cache/tessdata/
+          curl --fail --location --retry 4 \
+            https://github.com/tesseract-ocr/tessdata_fast/raw/main/eng.traineddata \
+            --output .cache/tessdata/eng.traineddata
+          tesseract --version
 
       - name: OCR scan pages
         run: >-
