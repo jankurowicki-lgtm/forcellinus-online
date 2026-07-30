@@ -31,6 +31,8 @@ jobs:
             "torch==2.2.2" "torchvision==0.17.2"
           git clone --depth 1 https://github.com/kperi/Kalchas.git .cache/Kalchas
           ln -s .cache/Kalchas/kalchas kalchas
+          sed -i 's/torch.load(model_path)/torch.load(model_path, map_location="cpu")/' .cache/Kalchas/kalchas/ocr.py
+          sed -i 's/torch.load(ARTIFACT_PATH)/torch.load(ARTIFACT_PATH, map_location="cpu")/' .cache/Kalchas/kalchas/ocr.py
 
       - name: Compare polytonic Greek models
         env:
