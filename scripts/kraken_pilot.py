@@ -70,14 +70,19 @@ def split_columns(source: Path, destination: Path) -> list[Path]:
     destination.mkdir(parents=True, exist_ok=True)
     image = Image.open(source)
     width, height = image.size
-    # The edition has three regular columns. A small overlap protects glyphs
-    # close to the gutters while keeping each crop a simple one-column page.
-    overlap = max(8, width // 250)
+    # The printed area is inset from the scan edges, so equal thirds cut off
+    # the ends of lines (often the Greek glosses) and leak neighbouring text.
+    # These bounds follow the vertical rules visible in both 1828 volumes.
+    bounds = (
+        (0.045, 0.360),
+        (0.350, 0.675),
+        (0.665, 0.980),
+    )
     crops = []
-    for column in range(3):
-        left = max(0, column * width // 3 - overlap)
-        right = min(width, (column + 1) * width // 3 + overlap)
-        path = destination / f"{source.stem}-column-{column + 1}.png"
+    for column, (left_ratio, right_ratio) in enumerate(bounds, start=1):
+        left = round(width * left_ratio)
+        right = round(width * right_ratio)
+        path = destination / f"{source.stem}-column-{column}.png"
         image.crop((left, 0, right, height)).save(path)
         crops.append(path)
     return crops
