@@ -5,10 +5,12 @@ on:
     branches: [ocr-pilot-zero-cost]
     paths:
       - scripts/column_ocr_pilot.py
+      - data/ocr-gold-corrections.json
       - .github/workflows/column-ocr-pilot.yml
   pull_request:
     paths:
       - scripts/column_ocr_pilot.py
+      - data/ocr-gold-corrections.json
       - .github/workflows/column-ocr-pilot.yml
   workflow_dispatch:
 
