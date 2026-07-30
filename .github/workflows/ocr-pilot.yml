@@ -1,0 +1,54 @@
+name: Zero-cost OCR pilot
+
+on:
+  push:
+    branches: [ocr-pilot-zero-cost]
+    paths:
+      - scripts/ocr_pilot.py
+      - .github/workflows/ocr-pilot.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  compare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Tesseract and image tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends imagemagick tesseract-ocr
+          mkdir -p .cache/tessdata-fast .cache/tessdata-best
+          for model in lat grc eng; do
+            curl --fail --location --retry 4 \
+              "https://github.com/tesseract-ocr/tessdata_fast/raw/main/${model}.traineddata" \
+              --output ".cache/tessdata-fast/${model}.traineddata"
+            curl --fail --location --retry 4 \
+              "https://github.com/tesseract-ocr/tessdata_best/raw/main/${model}.traineddata" \
+              --output ".cache/tessdata-best/${model}.traineddata"
+          done
+          tesseract --version
+
+      - name: Compare OCR configurations
+        run: >-
+          python scripts/ocr_pilot.py
+          --tessdata-fast .cache/tessdata-fast
+          --tessdata-best .cache/tessdata-best
+
+      - name: Print report
+        if: always()
+        run: test -f ocr-pilot-output/report.md && cat ocr-pilot-output/report.md || true
+
+      - name: Upload scans, OCR and report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: zero-cost-ocr-pilot
+          path: ocr-pilot-output
+          if-no-files-found: error
+          retention-days: 7
